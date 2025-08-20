@@ -64,83 +64,23 @@ if not defined PROFILE (
 )
 
 
-REM Extract endpoint_url using aws cli
+REM Extract endpoint_url and region using aws cli
 set "EP=%TEMP%\endpoint.tmp"
-aws configure get endpoint_url --profile %PROFILE% > "%EP%" 2>nul
-set /p "ENDPOINT_URL="<"%EP%" || set "ENDPOINT_URL="
-
-REM Validate endpoint_url, if true, go to extract_region
-if defined ENDPOINT_URL (
-    goto :extract_region
-)
-
-REM Fallback: manually parse config file if it has a service-specific format 
-REM and endpoint_url is nested under `s3 =` which is not visible to `aws configure get`
-set "CONFIG_SECTION=[services %PROFILE%]"
-set "ENDPOINT_URL="
-set "FOUND_SECTION=0"
-set "IN_S3_BLOCK=0"
-
-for /f "usebackq tokens=* delims=" %%L in ("%CONF_FILE%") do (
-    set "LINE=%%L"
-    set "TRIMMED_LINE=%%L"
-    set "TRIMMED_LINE=!TRIMMED_LINE: =!"
-
-    REM Detect the target section
-    echo !LINE! | findstr /C:"%CONFIG_SECTION%" >nul
-    if !errorlevel! == 0 (
-        set "FOUND_SECTION=1"
-        set "IN_S3_BLOCK=0"
-        REM Continue to next line
-    ) else (
-        REM If inside the section and hit another section header, break
-        if !FOUND_SECTION! == 1 (
-            echo !LINE! | findstr /R "^\[.*\]$" >nul
-            if !errorlevel! == 0 (
-                goto :validate_endpoint_url
-            )
-        )
-
-        REM If inside the section, look for 's3 ='
-        if !FOUND_SECTION! == 1 (
-            echo !TRIMMED_LINE! | findstr /C:"s3=" >nul
-            if !errorlevel! == 0 (
-                set "IN_S3_BLOCK=1"
-            )
-        )
-
-        REM If inside s3 block, look for 'endpoint_url ='
-        if !FOUND_SECTION! == 1 if !IN_S3_BLOCK! == 1 (
-            echo !TRIMMED_LINE! | findstr /C:"endpoint_url=" >nul
-            if !errorlevel! == 0 (
-                for /f "tokens=2 delims==" %%E in ("!TRIMMED_LINE!") do (
-                    set "ENDPOINT_URL=%%~E"
-                )
-                goto :validate_endpoint_url
-            )
-        )
-    )
-)
-
-:validate_endpoint_url
-if not defined ENDPOINT_URL (
-    exit /b 2
-)
-
-
-REM Extract region using aws cli
-:extract_region
 set "RG=%TEMP%\region.tmp"
+
+aws configure get endpoint_url --profile %PROFILE% > "%EP%" 2>nul
 aws configure get region --profile %PROFILE% > "%RG%" 2>nul
+
+set /p "ENDPOINT_URL="<"%EP%" || set "ENDPOINT_URL="
 set /p "REGION="<"%RG%" || set "REGION="
 
-REM Validate region, if true, go to extract_credentials
-if defined REGION (
+REM Validate endpoint_url and region, if true, go to extract_credentials
+if defined ENDPOINT_URL if defined REGION (
     goto :extract_credentials
 )
 
 REM Fallback: manually parse config file if it has a service-specific format 
-REM and region is nested under `s3 =` which is not visible to `aws configure get`
+REM and endpoint_url & region is nested under `s3 =` which is not visible to `aws configure get`
 set "CONFIG_SECTION=[services %PROFILE%]"
 set "REGION="
 set "FOUND_SECTION=0"
@@ -151,43 +91,51 @@ for /f "usebackq tokens=* delims=" %%L in ("%CONF_FILE%") do (
     set "TRIMMED_LINE=%%L"
     set "TRIMMED_LINE=!TRIMMED_LINE: =!"
 
-    REM Detect the target section
-    echo !LINE! | findstr /C:"%CONFIG_SECTION%" >nul
-    if !errorlevel! == 0 (
+    REM Detect the target section header exactly
+    if "!LINE!"=="%CONFIG_SECTION%" if !FOUND_SECTION! == 0 (
         set "FOUND_SECTION=1"
         set "IN_S3_BLOCK=0"
-        REM Continue to next line
-    ) else (
-        REM If inside the section and hit another section header, break
-        if !FOUND_SECTION! == 1 (
-            echo !LINE! | findstr /R "^\[.*\]$" >nul
-            if !errorlevel! == 0 (
-                goto :validate_region
-            )
-        )
+    )
 
-        REM If inside the section, look for 's3 ='
-        if !FOUND_SECTION! == 1 (
-            echo !TRIMMED_LINE! | findstr /C:"s3=" >nul
-            if !errorlevel! == 0 (
-                set "IN_S3_BLOCK=1"
-            )
-        )
-
-        REM If inside s3 block, look for 'region ='
-        if !FOUND_SECTION! == 1 if !IN_S3_BLOCK! == 1 (
-            echo !TRIMMED_LINE! | findstr /C:"region=" >nul
-            if !errorlevel! == 0 (
-                for /f "tokens=2 delims==" %%E in ("!TRIMMED_LINE!") do (
-                    set "REGION=%%~E"
-                )
-                goto :validate_region
-            )
+    REM If inside target section, look for s3 =
+    if !FOUND_SECTION! == 1 if !IN_S3_BLOCK! == 0 (
+        echo !TRIMMED_LINE! | findstr /C:"s3=" >nul
+        if !errorlevel! == 0 (
+            set "IN_S3_BLOCK=1"
         )
     )
+
+    REM If inside s3 block, extract endpoint_url or region
+    if !FOUND_SECTION! == 1 if !IN_S3_BLOCK! == 1 (
+        REM Check for endpoint_url line
+        echo !TRIMMED_LINE! | findstr /C:"endpoint_url=" >nul
+        if !errorlevel! == 0 (
+            for /f "tokens=2 delims==" %%E in ("!TRIMMED_LINE!") do (
+                set "ENDPOINT_URL=%%~E"
+            )
+        )
+
+        REM Check for region line
+        echo !TRIMMED_LINE! | findstr /C:"region=" >nul
+        if !errorlevel! == 0 (
+            for /f "tokens=2 delims==" %%R in ("!TRIMMED_LINE!") do (
+                set "REGION=%%~R"
+            )
+        )
+
+        REM If both found, exit loop early
+        if defined ENDPOINT_URL if defined REGION (
+            goto :validate_values
+        )
+    )
+	
 )
 
-:validate_region
+:validate_values
+if not defined ENDPOINT_URL (
+    exit /b 2
+)
+
 if not defined REGION (
     exit /b 5
 )
@@ -240,7 +188,7 @@ set "S3CMD_INI=%USERPROFILE%\AppData\Roaming\s3cmd.ini"
     echo preserve = False
     echo progress_meter = False
 REM CERT_CASE: append certificate conditionally (subject to change depending on your envirnoment)
-	if "%PROFILE%"=="nasvm-prod" (
+	if "%PROFILE%"=="dbaas-production" (
         echo ca_certs_file = %CERT_FILE%
 	) 
 	
@@ -308,7 +256,7 @@ REM Clear or write header
 >> "%INJECT_PS%" echo Write-Host -ForegroundColor White "AWS_REGION=" -NoNewline; Write-Host -ForegroundColor Green "$env:AWS_REGION"
 
 REM CERT_CASE: append certificate conditionally (subject to change depending on your envirnoment)
->> "%INJECT_PS%" echo if ($env:AWS_PROFILE -ieq 'nasvm-prod') {
+>> "%INJECT_PS%" echo if ($env:AWS_PROFILE -ieq 'dbaas-production') {
 >> "%INJECT_PS%" echo     [System.Environment]::SetEnvironmentVariable('AWS_CA_BUNDLE', '!CERT_FILE!', [System.EnvironmentVariableTarget]::Process)
 >> "%INJECT_PS%" echo     Write-Host -ForegroundColor White "AWS_CA_BUNDLE=" -NoNewline; Write-Host -ForegroundColor Green "$env:AWS_CA_BUNDLE"
 >> "%INJECT_PS%" echo } else {
@@ -340,7 +288,7 @@ set "CMD_INIT=%BIN_DIR%\script\cmd-init.cmd"
 >> "%CMD_INIT%" echo echo [1mAWS_REGION=[32m%REGION%[0m
 
 REM CERT_CASE: append certificate conditionally (subject to change depending on your envirnoment)
-if "%PROFILE%"=="nasvm-prod" (
+if "%PROFILE%"=="dbaas-production" (
     >> "%CMD_INIT%" echo set "AWS_CA_BUNDLE=%CERT_FILE%"
     >> "%CMD_INIT%" echo echo [1mAWS_CA_BUNDLE=[32m%CERT_FILE%[0m
 ) else (
