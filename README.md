@@ -1,6 +1,7 @@
 # awsctx
 A simple AWS S3 context switcher to setup shell environments for `aws` as well as third-party S3-compatible tools like `s3cmd`, `s4cmd` and `s5cmd` 
 
+
 ![awsctx demo bash](assets/awsctx_demo_bash.gif)
 
 ![awsctx demo cmd](assets/awsctx_demo_cmd.gif)
@@ -11,12 +12,12 @@ A simple AWS S3 context switcher to setup shell environments for `aws` as well a
 - Windows 10 / 11 (Command Prompt and PowerShell)
 
 ## Setup
-### Prerequisites
+#### Prerequisites
 - `aws`
 - `fzf`
 - Linux Bash Shell
 - Windows Command Prompt or PowerShell
-- C++ compiler (only for Windows and if C++ version prefered)
+- C++ compiler (only for Windows and if C++ launcher is prefered for robust shell detection)
 
 #### S3-compatible CLI clients:
   
@@ -28,7 +29,7 @@ A simple AWS S3 context switcher to setup shell environments for `aws` as well a
 
 ## Linux
 
-1. Place `awsctx.sh` the other files in the appropriate locations:
+1. Place `awsctx.sh` and other files in the appropriate locations:
 
 ```bash
 ~/.local/bin/awsctx.sh
@@ -98,22 +99,31 @@ A simple AWS S3 context switcher to setup shell environments for `aws` as well a
 
 ## Notes
 
-###  `awsctx` on Windows:
+### Config File Format
 
-  The batch script attempts to detect the current shell (CMD vs PowerShell), but **this can fail in nested shell environments** — for example, when cmd.exe was launching from PowerShell. In such cases, shell detection becomes unreliable in plain batch scripts.
+`awsctx` works with both types of AWS CLI config file — **Standard Config** and **Service-Specific Config** (indented format). 
 
-  If you typically run `awsctx` in a single shell environment (e.g., directly from Command-Prompt or PowerShell), you won’t encounter any issues.
+### Adjustments based on preferred S3 Client Tool
+
+Depending on your preference and envirnoment setup, some lines can be disabled or adjusted in the scripts.
+
+For example, if your preferred S3 client tool is `s5cmd`, comment-out section of the script where it generates `s3cmd.ini` (or `.s3cfg` on bash script) for `s3cmd` and `s4cmd`. Meanwhile, `HOME` variable which is only exported by Windows batch script won't be necessary as it is only used by `s4cmd`. 
+
+
+###  Shell Detection on Windows
+
+  The batch script attempts to detect the current shell (CMD vs PowerShell), but **this can fail in nested shell environments** — for example, when cmd.exe is launched from PowerShell. In such cases, shell detection becomes unreliable in plain batch scripts.
+
+  If you typically run `awsctx` in a single shell environment (e.g. directly from Command-Prompt or PowerShell), you won’t encounter any issues.
 
   However, for **more robust and accurate shell detection** — especially in environments where nested shells are common — use `awsctx.cpp` which handles shell detection and then, runs the batch script to setup aws/s3 profile in shell envirnoment (instructions in `README.md` under c++ directory)
 
+
 ### Certificate Handling
 
-If you're not using a custom certificate (e.g., for private S3 endpoints), some lines can be disabled or adjusted in the scripts. 
-To do that, search for `CERT_CASE` keyword in the script file you are using (`awsctx.sh` or `awsctx.cmd`) to find referenced sections.
+If you are not using a custom certificate, search for `CERT_CASE` keyword in the script file you are using to adjust referenced sections accordingly. 
 
-### Self-Signed Certificates
-
-On Windows, for `s3cmd` and `s4cmd`, if the endpoint uses a **self-signed certificate**, please be aware they rely on Python’s certificate store (not Windows). As the result:
+However, if you use **self-signed certificate** on Windows with `s3cmd` client tool, please be aware:
 
 - `s3cmd` requiries the certificate to include **Authority Key Identifier (AKI)** and **Subject Key Identifier (SKI)** extensions. If your CA bundle **does not include AKI and SKI**, `s3cmd` may reject the certificate. A workaround is adding below snippet to `ssl_verified_context()` method in `s3cmd-2.4.0\S3\ConnMan.py` file to disable `VERIFY_X509_STRICT` flag:
 ```python
@@ -121,10 +131,4 @@ if context:
     try:
         context.verify_flags &= ~ssl.VERIFY_X509_STRICT
       except AttributeError:
-```
-
-- `s4cmd` requires Python certificate store to be installed as it looks for CA bundle in that store. Therefore, make sure to install `certifi` and append the certficate to `cacert.pem`:
-```
-~$ pip install certifi
-~$ (echo. & type .aws\certificate.pem) >> C:\Users\YOUR_USER\AppData\Local\Programs\Python\Python313\Lib\site-packages\certifi\cacert.pem
 ```

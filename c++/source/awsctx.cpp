@@ -1,8 +1,7 @@
 // File: awsctx.cpp
 // Purpose: detects the running shell on windows (cmd or powershell) and pass it as a boolean value to 'build-init.cmd' to setup aws/s3 profile in shell envirnoment
-// Author: retrogaming457
-// GitHub: https://github.com/retrogaming457/awsctx/c++
-// Date: 2025-08-20
+// Author: Hamed Davodi
+// Date: 2025-08-21
 
 #define UNICODE
 #include <windows.h>

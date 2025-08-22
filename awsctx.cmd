@@ -1,8 +1,7 @@
 :: Script: awsctx.cmd
 :: Purpose: AWS/S3 context switcher for Windows
-:: Author: retrogaming457
-:: GitHub: https://github.com/retrogaming457/awsctx
-:: Date: 2025-08-20
+:: Author: Hamed Davodi
+:: Date: 2025-08-21
 
 @echo off
 setlocal EnableDelayedExpansion
@@ -38,10 +37,6 @@ goto :EOF
 :AFTER_SHELL_DETECTION
 setlocal EnableDelayedExpansion
 
-REM Detect code page
-for /f "tokens=2 delims=:" %%C in ('chcp') do set "CP=%%C"
-set "CP=%CP: =%" 
-
 REM Define escape character as variable
 for /f %%A in ('echo prompt $E ^| cmd') do set "ESC=%%A"
 
@@ -57,17 +52,9 @@ set "WHITE=%ESC%[37m"
 set "BRIGHT_BLUE=%ESC%[94m"
 set "BRIGHT_WHITE=%ESC%[97m"
 
-
-REM Define icons based on code page
-if "%CP%"=="65001" (
-    set "ARROW=→"
-    set "ICON_OK=%GREEN%%BOLD%✅%RESET%"
-    set "ICON_GO=%RED%%BOLD%🚀%RESET%"
-) else (
-    set "ARROW=-^>"
-    set "ICON_OK=%GREEN%%BOLD%[OK]%RESET%"
-    set "ICON_GO=%RED%%BOLD%[GO]%RESET%"
-)
+set "ARROW=-^>"
+set "ICON_OK=%GREEN%%BOLD%[OK]%RESET%"
+set "ICON_GO=%RED%%BOLD%[GO]%RESET%"
 
 
 REM Set path variables of necessary files
@@ -75,12 +62,12 @@ set "BIN_DIR=C:\Library\awsctx"
 set "AWS_DIR=%USERPROFILE%\.aws"
 set "CONF_FILE=%AWS_DIR%\config"
 set "CRED_FILE=%AWS_DIR%\credentials"
-set "CERT_FILE=%AWS_DIR%\certificate.pem"
+set "CERT_FILE=%AWS_DIR%\zs-storage-ca.pem"
 set "S3CMD_INI=%USERPROFILE%\AppData\Roaming\s3cmd.ini"
 
 REM Prompt user to choose a profile using fzf (fuzzy-finder)
 for /f "delims=" %%A in ('findstr /R "^\[.*\]$" "%CRED_FILE%" ^| fzf') do (
-    REM remove brackets of profile name 
+    REM Strip brackets of profile name 
 	set "line=%%A"
     set "line=!line:~1!"
     set "line=!line:~0,-1!"
@@ -232,7 +219,7 @@ if "%IS_POWERSHELL%" == "1" (
    call :build_ps_init
 )
 
-REM Print summary and prompt user to source init script if running on powershell
+REM Print summary and prompt user to source init script if running on powershell (copy source command to clipboard)
 	if "%IS_POWERSHELL%" == "1" (
 		
 		echo %CYAN%[awsctx]%RESET% %BOLD% aws  / s5cmd%RESET% %ARROW% %GREEN%%BOLD%%PROFILE%%RESET% %GRAY%profile%RESET% %ICON_OK% 
@@ -264,6 +251,9 @@ endlocal & (
 		set "AWS_REGION=%REGION%"
 		set "AWS_ENDPOINT_URL=%ENDPOINT_URL%"
 		set "S3_ENDPOINT_URL=%ENDPOINT_URL%"
+      
+REM HOME variable is only used by s4cmd. Comment-out if you're not using s4cmd.      
+        set "HOME=%USERPROFILE%"
 
 		echo %WHITE%%BOLD%AWS_PROFILE=%RESET%%GREEN%%BOLD%%PROFILE%%RESET%
 		echo %WHITE%%BOLD%AWS_REGION=%RESET%%GREEN%%BOLD%%REGION%%RESET%
@@ -308,6 +298,9 @@ REM Clear or write header
 >> "%INJECT_PS%" echo [System.Environment]::SetEnvironmentVariable('AWS_REGION', '!REGION!', [System.EnvironmentVariableTarget]::Process)
 >> "%INJECT_PS%" echo [System.Environment]::SetEnvironmentVariable('AWS_ENDPOINT_URL', '!ENDPOINT_URL!', [System.EnvironmentVariableTarget]::Process)
 >> "%INJECT_PS%" echo [System.Environment]::SetEnvironmentVariable('S3_ENDPOINT_URL', '!ENDPOINT_URL!', [System.EnvironmentVariableTarget]::Process)
+
+REM HOME variable is only used by s4cmd. Comment-out if you're not using s4cmd    
+>> "%INJECT_PS%" echo [System.Environment]::SetEnvironmentVariable('HOME', '!USERPROFILE!', [System.EnvironmentVariableTarget]::Process)
 
 >> "%INJECT_PS%" echo Write-Host -ForegroundColor White "AWS_PROFILE=" -NoNewline; Write-Host -ForegroundColor Green "$env:AWS_PROFILE"
 >> "%INJECT_PS%" echo Write-Host -ForegroundColor White "AWS_REGION=" -NoNewline; Write-Host -ForegroundColor Green "$env:AWS_REGION"

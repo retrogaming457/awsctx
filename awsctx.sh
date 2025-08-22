@@ -1,9 +1,8 @@
 #!/bin/bash
 # Script: awsctx.sh
 # Purpose: AWS/S3 context switcher for Linux bash
-# Author: retrogaming457
-# GitHub: https://github.com/retrogaming457/awsctx
-# Date: 2025-08-20
+# Author: Hamed Davodi
+# Date: 2025-08-21
 
 AWS_DIR="$HOME/.aws"
 CRED_FILE="$AWS_DIR/credentials"
@@ -36,7 +35,7 @@ PROFILE=$(grep '^\[' "$CRED_FILE" \
   | fzf)
 
 if [[ -z "$PROFILE" ]]; then
-  echo "No profile selected."
+  echo -e "${CYAN}[awsctx]${RESET} ${GRAY}No profile selected.${RESET}"
   return 0
 fi
 
@@ -47,10 +46,10 @@ ACCESS_KEY=$(aws configure get aws_access_key_id --profile "$PROFILE" 2>/dev/nul
 SECRET_KEY=$(aws configure get aws_secret_access_key --profile "$PROFILE" 2>/dev/null)
 
 
-# Validate endpoint_url
-# Fallback: manually parse config file if it has a service-specific format and
-# endpoint_url is nested under `s3 =` which is not visible to `aws configure get`
-if [[ -z "$ENDPOINT" ]]; then
+# Validate endpoint_url and region
+# Fallback: manually parse config file if it has a service-specific format and values of
+# endpoint_url and region are nested under `s3 =` which is not visible to `aws configure get`
+if [[ -z "$ENDPOINT" || -z "$REGION" ]]; then
 
   # Extract the service section name from [profile $PROFILE]
   SERVICE_NAME=$(sed -n "/^\[profile $PROFILE\]/,/^\[/p" "$CONF_FILE" \
@@ -63,54 +62,32 @@ if [[ -z "$ENDPOINT" ]]; then
   fi
 
   # Look under [services SERVICE_NAME] section for endpoint_url value
-  ENDPOINT=$(sed -n "/^\[services[[:space:]]\+$SERVICE_NAME\]/,/^\[/p" "$CONF_FILE" \
-       | awk -v svc="$SERVICE_NAME" '
-          /^\s*\[/ { in_section=0 }
-         $0 ~ "\\[services[[:space:]]+" svc "\\]" { in_section=1 }
-         in_section && /^\s*s3\s*=/ { in_s3=1; next }
-         in_s3 && /^\s*\[/ { in_s3=0 }
-         in_section && in_s3 && /^\s*endpoint_url\s*=/ {
-          sub(/.*=\s*/, "", $0); print
-        }
-     ')
+   ENDPOINT=$(awk -v svc="$SERVICE_NAME" '
+       $0 ~ "^[[:space:]]*\\[services[[:space:]]+" svc "\\]" { in_section=1; next }
+       in_section && /^\s*\[/ { in_section=0 }
+       in_section && /^\s*s3\s*=/ { in_s3=1; next }
+       in_section && /^\s*\[/ { in_s3=0 }
+       in_section && in_s3 && /^\s*endpoint_url\s*=/ {
+           sub(/.*=\s*/, "", $0); print; exit
+       }
+   ' "$CONF_FILE")
+
+   # Look under [services SERVICE_NAME] section for region value
+   REGION=$(awk -v svc="$SERVICE_NAME" '
+       $0 ~ "^[[:space:]]*\\[services[[:space:]]+" svc "\\]" { in_section=1; next }
+       in_section && /^\s*\[/ { in_section=0 }
+       in_section && /^\s*s3\s*=/ { in_s3=1; next }
+       in_section && /^\s*\[/ { in_s3=0 }
+       in_section && in_s3 && /^\s*region\s*=/ {
+           sub(/.*=\s*/, "", $0); print; exit
+       }
+   ' "$CONF_FILE")
 
   # Validate endpoint_url for the last time
   if [[ -z "$ENDPOINT" ]]; then
     echo -e "${CYAN}[awsctx]${RESET} ${GRAY}ERROR: endpoint_url not found.${RESET}"
     return 1
   fi
-fi
-
-
-# Validate region
-# Fallback: manually parse config file if it has a service-specific format and
-# region is nested under `s3 =` which is not visible to `aws configure get`
-if [[ -z "$REGION" ]]; then
-
-  # Extract the service section name from [profile $PROFILE]
-  SERVICE_NAME=$(sed -n "/^\[profile $PROFILE\]/,/^\[/p" "$CONF_FILE" \
-    | grep -E '^\s*services\s*=' \
-    | sed -E 's/.*=\s*//')
-
-
-  # Fallback: if no services= found, use profile name as service name
-  if [[ -z "$SERVICE_NAME" ]]; then
-    SERVICE_NAME="$PROFILE"
-  fi
-
-
-  # Look under [services SERVICE_NAME] section for region value
-  REGION=$(sed -n "/^\[services[[:space:]]\+$SERVICE_NAME\]/,/^\[/p" "$CONF_FILE" \
-    | awk -v svc="$SERVICE_NAME" '
-      /^\s*\[/ { in_section=0 }
-      $0 ~ "\\[services[[:space:]]+" svc "\\]" { in_section=1 }
-      in_section && /^\s*s3\s*=/ { in_s3=1; next }
-      in_s3 && /^\s*\[/ { in_s3=0 }
-      in_section && in_s3 && /^\s*region\s*=/ {
-          sub(/.*=\s*/, "", $0); print
-      }
-   ')
-
 
   # Validate region for the last time
   if [[ -z "$REGION" ]]; then
@@ -118,6 +95,7 @@ if [[ -z "$REGION" ]]; then
     return 1
   fi
 fi
+
 
 # Validate access_key
 if [[ -z "$ACCESS_KEY" ]]; then
