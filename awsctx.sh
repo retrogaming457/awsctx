@@ -30,9 +30,7 @@ RESET='\033[0m'
 
 
 # Prompt user to choose profile using fzf (fuzzy-finder)
-PROFILE=$(grep '^\[' "$CRED_FILE" \
-  | awk -F'[][]' '{print $2}' \
-  | fzf)
+PROFILE=$(grep '^\[' "$CRED_FILE" | awk -F'[][]' '{print $2}' | fzf)
 
 if [[ -z "$PROFILE" ]]; then
   echo -e "${CYAN}[awsctx]${RESET} ${GRAY}No profile selected.${RESET}"

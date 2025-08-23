@@ -40,7 +40,6 @@ A simple AWS S3 context switcher to setup shell environments for `aws` as well a
 
 2. Run the following commands to set up your environment:
 ```bash
-~$ chmod +x ~/.local/bin/awsctx.sh
 ~$ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 ~$ echo "alias awsctx='source ~/.local/bin/awsctx.sh'" >>  ~/.bashrc
 ~$ echo "source ~/.aws/.bashrc_awsctx"  >> ~/.bashrc

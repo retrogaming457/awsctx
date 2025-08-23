@@ -66,8 +66,8 @@ if defined ENDPOINT_URL if defined REGION (
     goto :extract_credentials
 )
 
-REM Fallback: manually parse config file if it has a service-specific format 
-REM and endpoint_url & region is nested under `s3 =` which is not visible to `aws configure get`
+REM Fallback: manually parse config file if it has a service-specific format and values of
+REM endpoint_url & region are nested under `s3 =` which is not visible to `aws configure get`
 set "CONFIG_SECTION=[services %PROFILE%]"
 set "REGION="
 set "FOUND_SECTION=0"
@@ -190,7 +190,7 @@ if "%IS_POWERSHELL%" == "1" (
 )
 
 
-REM Print messages and ask user to source init script for the running shell (copy source command to clipboard)
+REM Print messages and prompt user to source init script for the running shell (copy source command to clipboard)
 	if "%IS_POWERSHELL%" == "1" (
 		
 		echo %CYAN%[awsctx]%RESET% %BOLD% aws  / s5cmd%RESET% %ARROW% %GREEN%%BOLD%%PROFILE%%RESET% %GRAY%profile%RESET% %ICON_OK% 

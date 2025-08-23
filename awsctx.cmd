@@ -95,8 +95,8 @@ if defined ENDPOINT_URL if defined REGION (
     goto :extract_credentials
 )
 
-REM Fallback: manually parse config file if it has a service-specific format 
-REM and endpoint_url & region is nested under `s3 =` which is not visible to `aws configure get`
+REM Fallback: manually parse config file if it has a service-specific format and values of
+REM endpoint_url & region are nested under `s3 =` which is not visible to `aws configure get`
 set "CONFIG_SECTION=[services %PROFILE%]"
 set "REGION="
 set "FOUND_SECTION=0"
@@ -272,7 +272,7 @@ REM CERT_CASE: append certificate conditionally (subject to change depending on 
 
 	
 	)
-    set "IS_POWERSHELL=
+    set "IS_POWERSHELL="
     
 )
 
